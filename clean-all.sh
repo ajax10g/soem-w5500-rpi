@@ -1,5 +1,3 @@
-
-
 cd osal
 make clean
 cd ../oshw
@@ -12,7 +10,7 @@ cd ../xmc4800
 make clean
 cd ../xmc4800_dc
 make clean
+cd ../vtoc32_dc
+make clean
 cd ..
 cd ..
-
-

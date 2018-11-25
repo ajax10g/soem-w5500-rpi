@@ -1,0 +1,9 @@
+**/*.a
+**/*.o
+**/*.STOCK
+**/*.swp
+**/.view
+**/tags
+**/slaveinfo
+**/xmc4800
+**/xmc4800_dc
