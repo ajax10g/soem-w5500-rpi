@@ -436,13 +436,18 @@ void print_run(void *arg)
 			{
 				if (stick==0)
 					rt_printf("waiting for system ready...\n");
-				if (stick%10==0)
+				if (stick%10==0){
 					rt_printf("%i\n", stick/10);
+					rt_printf("\n\n\n");
+				}
 				stick++;
 			}
 			else
 			{
 				itime++;
+				rt_printf("\033[%dA", 1+NUMOFXMC); // clpham: move the cursor up %d lines
+				rt_printf("\e[2K"); // clear line
+
 				rt_printf("Time=%06d.%01d,  \e[31;1mfail=%ld\e[0m, ecat_T=%ld, ecat_maxT=%ld, \e[33;1mecat_jitterT=%d\e[0m\n", itime/10, itime%10, recv_fail_cnt,  ethercat_time/1000, worst_time/1000, jitter/1000);
 				//clpham:
 				for(i=0; i<NUMOFXMC; ++i)
@@ -451,8 +456,8 @@ void print_run(void *arg)
 				   (uint8_t)(xmc_module_pt[i].ptin_data->Valves9To16 <<6) >>7);
 				//rt_printf("\n");
 
-				rt_printf("\033[%dA", 1+NUMOFXMC); // clpham: move the cursor up %d lines
-				rt_printf("\e[2K"); // clear line
+				/* rt_printf("\033[%dA", 1+NUMOFXMC); // clpham: move the cursor up %d lines */
+				/* rt_printf("\e[2K"); // clear line */
 			}
 
 		}
