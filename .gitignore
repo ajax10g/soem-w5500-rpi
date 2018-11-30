@@ -2,6 +2,7 @@
 **/*.o
 **/*.STOCK
 **/*.swp
+**/*.swo
 **/.view
 **/tags
 **/slaveinfo

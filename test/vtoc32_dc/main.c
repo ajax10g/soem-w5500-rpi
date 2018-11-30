@@ -40,6 +40,7 @@
 #include "ecat_dc.h"
 #include "wiznet_drv.h"
 
+
 #define NSEC_PER_SEC 			1000000000
 #define EC_TIMEOUTMON 500
 
@@ -96,6 +97,7 @@ int bit5 : 1;
 int bit6 : 1;
 int bit7 : 1;
 } valveBits_t;
+void ecatcheck( void *arg );
 
 boolean ecat_init(void)
 {
@@ -471,6 +473,7 @@ void catch_signal(int sig)
 	usleep(5e5);
 	rt_task_delete(&demo_task);
 	rt_task_delete(&print_task);
+	rt_task_delete(&eccheck_task);
 	exit(1);
 }
 
@@ -496,6 +499,7 @@ int main(int argc, char *argv[])
 	
   	rt_task_create(&demo_task, "SOEM_demo_task", 0, 90, 0 );
 	rt_task_create(&print_task, "ec_printing", 0, 50, 0 );
+	rt_task_create(&eccheck_task, "ecatcheck", 0, 50, 0 );
 #if 0
 	//clpham:
 	int i;
@@ -509,6 +513,7 @@ int main(int argc, char *argv[])
 
 	rt_task_start(&demo_task, &demo_run, NULL);
 	rt_task_start(&print_task, &print_run, NULL);
+	rt_task_start(&eccheck_task, &ecatcheck, NULL);
 
    	while (run)
 	{
@@ -518,4 +523,84 @@ int main(int argc, char *argv[])
 
    printf("End program\n");
    return (0);
+}
+
+//clpham:
+void ecatcheck( void *arg )
+{
+    int slave;
+    (void)arg;                  /* Not used */
+
+	rt_task_set_periodic(NULL, TM_NOW, 10000000);
+    while(run)
+    {
+		rt_task_wait_period(NULL); 	//wait for next cycle
+        if( inOP && ((wkc < expectedWKC) || ec_group[currentgroup].docheckstate))
+        {
+            if (needlf)
+            {
+               needlf = FALSE;
+               rt_printf("\n");
+            }
+            /* one ore more slaves are not responding */
+            ec_group[currentgroup].docheckstate = FALSE;
+            ec_readstate();
+            for (slave = 1; slave <= ec_slavecount; slave++)
+            {
+               if ((ec_slave[slave].group == currentgroup) && (ec_slave[slave].state != EC_STATE_OPERATIONAL))
+               {
+                  ec_group[currentgroup].docheckstate = TRUE;
+                  if (ec_slave[slave].state == (EC_STATE_SAFE_OP + EC_STATE_ERROR))
+                  {
+                     rt_printf("ERROR : slave %d is in SAFE_OP + ERROR, attempting ack.\n", slave);
+                     ec_slave[slave].state = (EC_STATE_SAFE_OP + EC_STATE_ACK);
+                     ec_writestate(slave);
+                  }
+                  else if(ec_slave[slave].state == EC_STATE_SAFE_OP)
+                  {
+                     rt_printf("WARNING : slave %d is in SAFE_OP, change to OPERATIONAL.\n", slave);
+                     ec_slave[slave].state = EC_STATE_OPERATIONAL;
+                     ec_writestate(slave);
+                  }
+                  else if(ec_slave[slave].state > EC_STATE_NONE)
+                  {
+                     if (ec_reconfig_slave(slave, EC_TIMEOUTMON))
+                     {
+                        ec_slave[slave].islost = FALSE;
+                        rt_printf("MESSAGE : slave %d reconfigured\n",slave);
+                     }
+                  }
+                  else if(!ec_slave[slave].islost)
+                  {
+                     /* re-check state */
+                     ec_statecheck(slave, EC_STATE_OPERATIONAL, EC_TIMEOUTRET);
+                     if (ec_slave[slave].state == EC_STATE_NONE)
+                     {
+                        ec_slave[slave].islost = TRUE;
+                        rt_printf("ERROR : slave %d lost\n",slave);
+                     }
+                  }
+               }
+               if (ec_slave[slave].islost)
+               {
+                  if(ec_slave[slave].state == EC_STATE_NONE)
+                  {
+                     if (ec_recover_slave(slave, EC_TIMEOUTMON))
+                     {
+                        ec_slave[slave].islost = FALSE;
+                        rt_printf("MESSAGE : slave %d recovered\n",slave);
+                     }
+                  }
+                  else
+                  {
+                     ec_slave[slave].islost = FALSE;
+                     rt_printf("MESSAGE : slave %d found\n",slave);
+                  }
+               }
+            }
+            if(!ec_group[currentgroup].docheckstate)
+               rt_printf("OK : all slaves resumed OPERATIONAL.\n");
+        }
+        /* osal_usleep(10000); */
+    }
 }
